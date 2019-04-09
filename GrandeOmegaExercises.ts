@@ -440,14 +440,25 @@ type Exception<a> = Either<string,a>
 
 // Let us consider a process that works on state. Such a process will be able, at all times, to both read from and write to the state.
 // It also represents a computation and it will therefore produce a result of an arbitraty type.
-type State<s, a> = Fun<s, Pair<a, s>>
+
+interface State<s, a> {
+  run: Fun<s, Pair<a, s>>
+  then: <b>(f: Fun<a, State<s, b>>) => State<s, b> //this is bind
+}
+
+let run_State = <s,a>() : Fun<State<s,a>, Fun<s, Pair<a, s>>> => Fun(s => s.run)
+
+let make_State = <s,a>(run:Fun<s, Pair<a, s>>) : State<s,a> => ({ 
+    run:run, 
+    then:function<b>(this:State<s,a>, k:Fun<a, State<s, b>>) : State<s,b> { return bind_State(this,k) } 
+  })
 
 let map_State = <s, a, b>(f: Fun<a, b>): Fun<State<s, a>, State<s, b>> =>
-  Fun((p: State<s, a>) => p.then(map_pair(f, id<s>())))
+  Fun((p: State<s, a>) => make_State(p.run.then(map_pair(f, id<s>()))))
 
 let unit_State = <s, a>(): Fun<a, State<s, a>> => 
   Fun((x: a) => 
-    Fun<s, Pair<a, s>>((state: s) => Pair(x, state))
+    make_State(Fun<s, Pair<a, s>>((state: s) => Pair(x, state)))
   )
 
 let apply = <a, b>(): Fun<Pair<Fun<a, b>, a>, b> => 
@@ -455,17 +466,17 @@ let apply = <a, b>(): Fun<Pair<Fun<a, b>, a>, b> =>
 
 let join_State = <s, a>(): Fun<State<s, State<s, a>>, State<s, a>> => 
   Fun((p: State<s, State<s, a>>): State<s, a> => 
-    p.then(apply())
+    make_State(p.run.then(map_pair(run_State(), id())).then(apply()))
   )
 
 let bind_State = <s, a, b>(p: State<s, a>, f: Fun<a, State<s, b>>): State<s, b> => 
   map_State<s, a, State<s, b>>(f).then(join_State<s, b>()).f(p)
 
 let get_State = <s>(): State<s, s> => 
-  Fun<s, Pair<s, s>>((state: s) => Pair(state, state))
+  make_State(Fun<s, Pair<s, s>>((state: s) => Pair(state, state)))
 
 let set_State = <s>(state: s): State<s, Unit> => 
-  Fun<s, Pair<Unit, s>>((_: s) => Pair({}, state))
+  make_State(Fun<s, Pair<Unit, s>>((_: s) => Pair({}, state)))
 
 // Text-based renderer
 // A renderer takes a rendering buffer as input, and produces a new rendering buffer with the extra drawing operations applied to it.
@@ -473,10 +484,10 @@ type RenderingBuffer = string
 type Renderer = State<RenderingBuffer, Unit>
 
 // Unit
-let render_nothing : Renderer = Fun(b => ({ fst: {}, snd: b }))
+let render_nothing : Renderer = make_State(Fun(b => ({ fst: {}, snd: b })))
 
 // Adds a string to buffer
-let render_string = (s:string) : Renderer => Fun(b => ({ fst:{}, snd:b + s}))
+let render_string = (s:string) : Renderer => make_State(Fun(b => ({ fst:{}, snd:b + s})))
 
 // We can use this to render fixed primitives
 let render_asterisk = render_string("*")
@@ -509,18 +520,20 @@ let set_var = (_var: string, value: number): Instruction<Unit> =>
     ))
 
 let incr_var = (_var : string): Instruction<Unit> =>
-    bind_State(get_var(_var), Fun((v: number) => set_var(_var, v + 1)))
+    get_var(_var).then(Fun((v: number) => set_var(_var, v + 1)))
 
-let swap_var = (var1: string, var2: string): Instruction<Unit> => 
-    bind_State(get_var(var1), Fun((v1: number) =>
-    bind_State(get_var(var2), Fun((v2: number) =>
-    bind_State(set_var(var1, v2), Fun((_: Unit) =>
-    set_var(var2, v1)))))))
-
+let swap_var_and_incr = (var1: string, var2: string): Instruction<Unit> => 
+    get_var(var1).then(Fun((v1: number) =>
+    get_var(var2).then(Fun((v2: number) =>
+    set_var(var1, v2).then(Fun((_: Unit) =>
+    set_var(var2, v1).then(Fun((_:Unit) =>
+    incr_var(var1).then(Fun((_:Unit) =>
+    incr_var(var2)
+    ))))))))))
 
 // Extend the imperative language defined in class with the State monad to include the evaluation of a code block:
 let seq = (current: Instruction<Unit>, next: Instruction<Unit>): Instruction<Unit> => 
-    bind_State(current, Fun((_: Unit) => next))
+    current.then(Fun((_: Unit) => next))
 
 // A code block always terminates with a special statement that does nothing. This is also used to define empty blocks
 let skip = (): Instruction<Unit> => unit_State<Memory, Unit>().f({})
@@ -530,15 +543,15 @@ let skip = (): Instruction<Unit> => unit_State<Memory, Unit>().f({})
 // If the condition evaluates to true it runs _then otherwise it runs _else. 
 // Note that _then and _else may be code blocks (see Question 1).
 
-let instr_ifThenElse = (condition: Instruction<boolean>, _then: Instruction<Unit>, _else: Instruction<Unit>): Instruction<Unit> =>
-    bind_State(condition, Fun(c => c ? _then : _else))
+let _ifThenElse = (condition: Instruction<boolean>, _then: Instruction<Unit>, _else: Instruction<Unit>): Instruction<Unit> =>
+    condition.then(Fun(c => c ? _then : _else))
 
 // Extend the imperative language defined with the State monad to include a loop instruction.
-// This function uses bind_State to evaluate the condition.
+// This function uses bind_State (now `then`) to evaluate the condition.
 // If the result is true then body is evaluated and then recursively the whole _while is re-evaluated again. 
 // If the condition is false the statement does nothing (you can use `skip` in this case).
 let _while = (condition: Instruction<boolean>, body: Instruction<Unit>): Instruction<Unit> => 
-    bind_State(condition, Fun(c => 
-        c ? bind_State(body, Fun((_: Unit) => _while(condition, body))) : skip()
+    condition.then(Fun(c => 
+        c ? body.then(Fun((_: Unit) => _while(condition, body))) : skip()
     ))
 
