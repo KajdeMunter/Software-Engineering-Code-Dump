@@ -106,15 +106,15 @@ console.log(encode.f(3).f(hiList))
 Implement an Exception Functor Exception<a> where its data structure is defined with a discriminate union made of Result and Error. 
 Result contains an element of type a while Error contains a string reporting an error message.
 */
-interface Result<a> {
+type Result<a> = {
     el:a
 }
 
-interface Error {
+type Error = {
     err:string
 }
 
-//type Exception<a> = Result<a> | Error
+type Ex<a> = Result<a> | Error
 
 /*
 Consider a tile game where each tile can be either terrain, a town, or an army. 
@@ -126,27 +126,16 @@ Implement the tile as a Tile Functor whose data structure is Tile<a>, where a de
 
 Implement the composite functor List<Tile<a>> that converts all the tiles of type a in a different tile.
 */
-interface terrain {
-    color: "Brown"
-}
 
-interface town {
-    color: "Grey"
-}
+type TileType = "terrain" | "town" | "army"
 
-interface army {
-    color: "Green"
-}
+type Tile<TileType> = { kind:TileType }
 
-type TileType = terrain | town | army;
+let tile = () : Fun<TileType, Tile<TileType>> => 
+  Fun(tile => ({ kind:tile }))
 
-type Tile<a extends TileType> = { kind: a };
-
-let Tile = <a extends TileType>(type:a): Tile<a> => ({ kind: type })
-
-// let map_tile = <a extends TileType, b extends TileType>(f: Fun<a, b>): Fun<Tile<a>, Tile<b>> => 
-//     Fun<Tile<a>, Tile<b>>(t => f.f(t.kind)
-
+let map_tile = <a extends TileType, b extends TileType>(f: Fun<a,b>) : Fun<Tile<a>, Tile<b>> =>
+  Fun(tile => ({kind:f.f(tile.kind)}))
 
 type Unit = {}
 let Unit : Unit = {}
@@ -332,8 +321,8 @@ interface ServerConnection {
 
 // and store a collection of servers in a global variable. Use Math.random to simulate a network failure with a probability of 15% (in this case the function returns `none`).
 
-let connect = (ip: string): Option<ServerConnection> => 
-    Math.random() < 0.15 ? None<ServerConnection>() : Some<ServerConnection>().f({ip:ip, hello:"Hello World!"})
+let connect = () : Fun<string, Option<ServerConnection>> => 
+    Fun(s => Math.random() < 0.15 ? None<ServerConnection>() : Some<ServerConnection>().f({ip:s, hello:"Hello World!"}))
 
 /*
 Build a function that simulates a request to a Server after a successful connection. 
@@ -345,8 +334,8 @@ interface ServerContent {
   content: string //content message
 }
 
-let get = (ip: string): Option<ServerContent> => 
-    Math.random() < 0.75 ? Some<ServerContent>().f({ip: ip, content: "Server Content"}) : None<ServerContent>()
+let get = (): Fun<string, Option<ServerContent>> => 
+    Fun(s => Math.random() < 0.75 ? Some<ServerContent>().f({ip: s, content: "Server Content"}) : None<ServerContent>())
 
 
 /*
@@ -355,23 +344,23 @@ This function first requests the connection and prints the welcome message from 
 After this it uses the server connection to get the content of the server and prints it.
 */
 let handlecon = (ip: string): Option<ServerContent> => {
-    
-    // bind_option<ServerConnection, ServerContent>()
+    return null!
+    // bind_option(connect()).then(bind_option(get())).f(ip)
 
-    let con = connect(ip);
-    let getcon = get(ip);
+    // let con = connect(ip);
+    // let getcon = get(ip);
 
-    if(con.kind === "none") {
-        return None<ServerContent>();
-    } else {
-        console.log(con.value.hello);
-        if(getcon.kind === "none") {
-            return None<ServerContent>();
-        } else {
-            console.log(getcon.value.content)
-            return Some<ServerContent>().f(getcon.value)
-        }
-    }
+    // if(con.kind === "none") {
+    //     return None<ServerContent>();
+    // } else {
+    //     console.log(con.value.hello);
+    //     if(getcon.kind === "none") {
+    //         return None<ServerContent>();
+    //     } else {
+    //         console.log(getcon.value.content)
+    //         return Some<ServerContent>().f(getcon.value)
+    //     }
+    // }
 }
 
 for(let i = 0; i < 10; i++) {
@@ -386,7 +375,6 @@ type Either<a, b> = {
     kind: "right",
     value: b
 }
-
 
 let inl = <a, b>(): Fun<a, Either<a, b>> => {
     return Fun<a, Either<a, b>>((x: a) => {
@@ -554,4 +542,37 @@ let _while = (condition: Instruction<boolean>, body: Instruction<Unit>): Instruc
     condition.then(Fun(c => 
         c ? body.then(Fun((_: Unit) => _while(condition, body))) : skip()
     ))
+
+// we could consider combining the Either and State monads into a single monad, which we will call Process:
+type Process<s,e,a> = Fun<s, Either<e, Pair<a,s>>>
+
+let unit_Process = <s, e, a>() : Fun<a, Process<s, e, a>> => 
+  Fun((x:a) => Fun((state:s) => unit_Either<Pair<a, s>, e>().f(Pair(x, state))))
+
+// Joining processes requires launching a process, then propagating the possible errors (the left hand side of map_Either) 
+// and then joining the resulting nested Either after the nested inner process has been evaluated as well.
+let join_Process = <s, e, a>() : Fun<Process<s, e, Process<s, e, a>>, Process<s, e, a>> =>
+  Fun(p_p => p_p.then(map_Either(id<e>(), apply())).then(join_Either()))
+
+let map_Process = <s, e, a, b>(f: Fun<a, b>) : Fun<Process<s, e, a>, Process<s, e, b>> => 
+  Fun(p => p.then(map_Either(id<e>(), map_pair(f, id<s>()))))
+
+type P_error = string
+type P_instruction<a> = Process<Memory, P_error, a>
+
+// The core instructions therefore become reading and writing to memory, 
+// but this time, when the variable name is not available, we can gracefully handle the error:
+
+// Somehow, doesnt actually work
+// let p_get_var = (v:string) : P_instruction<number> =>
+//   get_State().then(Fun((m:Memory) =>
+//       m.has(v) ? unit_Process().f(m.get(v))
+//       : inl().f(`Error: variable ${v} does not exist`)
+//     )
+//   )
+  
+
+// let p_set_var = (v:string, n:number) : P_instruction<Unit> =>
+//   get_State().then(Fun((m:Memory) =>
+//   set_State(m.set(v, n))))
 
