@@ -354,7 +354,9 @@ This function first requests the connection and prints the welcome message from 
 After this it uses the server connection to get the content of the server and prints it.
 */
 let handlecon = (ip: string): Option<ServerContent> =>
-    bind_option(connect()).then(bind_option(get())).f(Some<string>().f(ip))
+    bind_option(connect()).then(
+    bind_option(get())
+    ).f(Some<string>().f(ip))
 
 // let con = connect(ip);
 // let getcon = get(ip);
