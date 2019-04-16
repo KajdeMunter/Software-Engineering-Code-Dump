@@ -214,7 +214,7 @@ let unit_option = <a>():Fun<a, Option<a>> => Some<a>()
 let join_option = <a>():Fun<Option<Option<a>>, Option<a>> => Fun(x => x.kind == "some" ? x.value : None<a>())
 
 let bind_option = <a,b>(k: Fun<a, Option<b>>): Fun<Option<a>, Option<b>> =>
-    Fun(o => map_Option(k).then(join_option<b>()).f(o))
+    map_Option(k).then(join_option<b>())
 
 // Extend the List functor with the monoid operations for functors:
 
@@ -233,7 +233,7 @@ let join_list = <a>():Fun<List<List<a>>, List<a>> =>
 // let bind = function<a, b>(k: Fun<a, List<b>>): Fun<List<a>,List<b>> {...}
 
 let bind_list = <a,b>(k: Fun<a, List<b>>): Fun<List<a>, List<b>> =>
-    Fun(l => map_list<a,List<b>>(k).then(join_list<b>()).f(l))
+    map_list(k).then(join_list<b>())
 
 // Define the Set functor. A set is a data structure containing non-repeated elements of type `a`. Implement the `map_Set` function to give it a functorial structure:
 
@@ -260,9 +260,12 @@ type DoublyList<a> = {
     head: a
     tail: DoublyList<a>
     prev: DoublyList<a>
-  } | {
+  } | { // last node
     kind: "Empty"
     prev: DoublyList<a>
+  } | { // first node
+    kind: "Empty"
+    tail: DoublyList<a>
   }
 
 // Constructor to create cons
@@ -276,21 +279,28 @@ let DoublyCons = <a>(val:a, t:DoublyList<a>, p:DoublyList<a>): DoublyList<a> => 
 }
 
 // Constructor to create empty
-let DoublyEmpty = <a>(p:DoublyList<a>): DoublyList<a> =>  { 
+let DoublyEmptyLast = <a>(p:DoublyList<a>): DoublyList<a> =>  { 
     return {
         kind: "Empty",
         prev: p
     } 
 }
 
+let DoublyEmptyFirst = <a>(t:DoublyList<a>): DoublyList<a> =>  { 
+  return {
+      kind: "Empty",
+      tail: t
+  } 
+}
+
 // Implement the map_DoublyLinkedList function for a Binary Tree.
-// let map_DoublyLinkedList = <a, b>(_: Fun<a, b>) : 
-// Fun<DoublyLinkedList<a>, DoublyLinkedList<b>>
+// let map_DoublyLinkedList = <a, b>(_: Fun<a, b>) : Fun<DoublyList<a>, DoublyList<b>>
+
 
 // let map_doublylist = <a,b>(f:Fun<a,b>): Fun<DoublyList<a>,DoublyList<b>> => 
-//     Fun<DoublyList<a>,DoublyList<b>>(l => 
+//     Fun(l => 
 //         l.kind === "Cons" 
-//         ? DoublyCons(f.f(l.head), map_doublylist(f).f(l.tail)) 
+//         ? DoublyCons(f.f(l.head), map_doublylist(f).f(l.tail), l.prev)
 //         : DoublyEmpty<b>(l));
 
 // Extend this functor with join and unit and give it a monoidal structure.
@@ -334,8 +344,8 @@ interface ServerContent {
   content: string //content message
 }
 
-let get = (): Fun<string, Option<ServerContent>> => 
-    Fun(s => Math.random() < 0.75 ? Some<ServerContent>().f({ip: s, content: "Server Content"}) : None<ServerContent>())
+let get = (): Fun<ServerConnection, Option<ServerContent>> => 
+    Fun(s => Math.random() < 0.75 ? Some<ServerContent>().f({ip: s.ip, content: "Server Content"}) : None<ServerContent>())
 
 
 /*
@@ -343,28 +353,26 @@ Build a function that uses the option monad and bind_Option to handle the server
 This function first requests the connection and prints the welcome message from the server. 
 After this it uses the server connection to get the content of the server and prints it.
 */
-let handlecon = (ip: string): Option<ServerContent> => {
-    return null!
-    // bind_option(connect()).then(bind_option(get())).f(ip)
+let handlecon = (ip: string): Option<ServerContent> =>
+    bind_option(connect()).then(bind_option(get())).f(Some<string>().f(ip))
 
-    // let con = connect(ip);
-    // let getcon = get(ip);
+// let con = connect(ip);
+// let getcon = get(ip);
 
-    // if(con.kind === "none") {
-    //     return None<ServerContent>();
-    // } else {
-    //     console.log(con.value.hello);
-    //     if(getcon.kind === "none") {
-    //         return None<ServerContent>();
-    //     } else {
-    //         console.log(getcon.value.content)
-    //         return Some<ServerContent>().f(getcon.value)
-    //     }
-    // }
-}
+// if(con.kind === "none") {
+//     return None<ServerContent>();
+// } else {
+//     console.log(con.value.hello);
+//     if(getcon.kind === "none") {
+//         return None<ServerContent>();
+//     } else {
+//         console.log(getcon.value.content)
+//         return Some<ServerContent>().f(getcon.value)
+//     }
+// }
 
 for(let i = 0; i < 10; i++) {
-    handlecon("kaas")
+    console.log(handlecon("kaas"))
 }
 
 // Either implementation
@@ -563,14 +571,17 @@ type P_instruction<a> = Process<Memory, P_error, a>
 // The core instructions therefore become reading and writing to memory, 
 // but this time, when the variable name is not available, we can gracefully handle the error:
 
-// Somehow, doesnt actually work
 // let p_get_var = (v:string) : P_instruction<number> =>
 //   get_State().then(Fun((m:Memory) =>
-//       m.has(v) ? unit_Process().f(m.get(v))
-//       : inl().f(`Error: variable ${v} does not exist`)
+//       m.has(v) ? unit_Process<Memory, P_error, number>().f(m.get(v))
+//       : inl<{}, Either().f(`Error: variable ${v} does not exist`)
 //     )
 //   )
   
+let sget_var = (_var: string): Instruction<number> =>
+  bind_State(get_State(), Fun((m: Memory) =>
+      unit_State<Memory, number>().f(m.get(_var))
+  ))
 
 // let p_set_var = (v:string, n:number) : P_instruction<Unit> =>
 //   get_State().then(Fun((m:Memory) =>
