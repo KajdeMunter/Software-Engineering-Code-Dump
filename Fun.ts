@@ -1,3 +1,5 @@
+import { Pair } from "./PairMonad";
+
 export type Fun<a,b> = {
     f: (_:a) => b,
     then: <c>(_:Fun<b,c>) => Fun<a,c>,
@@ -20,12 +22,13 @@ export let then = <a,b,c>(f: Fun<a,b>, g: Fun<b,c>): Fun<a,c> =>
     Fun<a,c>(x => g.f(f.f(x)))
 
 
-export let repeat = <a>(f: Fun<a, a>, n: number): Fun<a, a> => {
-    if (n <= 0) {
-        return f;
-    }
-    else {
-        return f.then(repeat(f, n-1));
-    }
-}
-    
+export let repeat = <a>(f: Fun<a, a>, n: number): Fun<a, a> =>
+    n <= 0 
+    ? f
+    : f.then(repeat(f, n-1))
+
+export let id = <a>() : Fun<a,a> => Fun(x => x)
+
+export type Unit = {}
+export let Unit : Unit = {}
+// export let Unit = () : Fun<Unit, Unit> => Fun((_:Unit) => _)
