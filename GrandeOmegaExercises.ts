@@ -1,26 +1,5 @@
 import * as Immutable from "immutable"
-
-let Fun = function <a, b>(f: (_: a) => b): Fun<a, b> {
-    return {
-        f: f,
-        then: function <c>(g: Fun<b, c>): Fun<a, c> {
-            return then(this, g)
-        },
-        repeat: function (this: Fun<a, a>): Fun<number, Fun<a, a>> {
-            return Fun<number, Fun<a, a>>(x => repeat(this, x));
-        },
-    }
-}
-
-type Fun<a, b> = {
-    f: (_: a) => b
-    then: <c>(g: Fun<b, c>) => Fun<a, c>
-    repeat: () => Fun<number, Fun<a, a>>
-}
-
-let then = function <a, b, c>(f: Fun<a, b>, g: Fun<b, c>): Fun<a, c> {
-    return Fun<a, c>((x:a) => g.f(f.f(x)))
-}
+import { Fun } from "./Fun";
 
 let incr = Fun((x: number) => x + 1)
 let double = Fun((x: number) => x * 2)
@@ -55,15 +34,6 @@ console.log(ifThenElse(isPositive, squareRoot, invert.then(squareRoot)).f(3));
 console.log(square.then(ifThenElse(isEven, invert, squareRoot)).f(4));
 
 
-let repeat = <a>(f: Fun<a, a>, n: number): Fun<a, a> => {
-    if (n <= 0) {
-        return f;
-    }
-    else {
-        return f.then(repeat(f, n-1));
-    }
-}
-
 type List<a> = {
     kind: "Cons"
     head: a
@@ -91,9 +61,9 @@ let Empty = <a>(): List<a> =>  {
 let hiList = Cons<string>("h", Cons<string>("i", Empty<string>()))
 
 let map_list = <a,b>(f:Fun<a,b>): Fun<List<a>,List<b>> => 
-    Fun<List<a>,List<b>>(l => 
+    Fun(l => 
         l.kind === "Cons" 
-        ? Cons(f.f(l.head), map_list(f).f(l.tail)) 
+        ? Cons<b>(f.f(l.head), map_list(f).f(l.tail)) 
         : Empty<b>());
 
 
@@ -224,7 +194,7 @@ let bind_option = <a,b>(k: Fun<a, Option<b>>): Fun<Option<a>, Option<b>> =>
 
 let unit_list = <a>():Fun<a, List<a>> => Fun((_:a) => Empty<a>());
 let join_list = <a>():Fun<List<List<a>>, List<a>> => 
-        Fun(l_l => l_l.kind === "Empty" ? l_l : plus_list<a>().f({fst: l_l.head, snd: join_list<a>().f(l_l.tail)}))
+  Fun(l_l => l_l.kind === "Empty" ? l_l : plus_list<a>().f({fst: l_l.head, snd: join_list<a>().f(l_l.tail)}))
  
 //let then_F = <a,b>(f:Fun<a,F<b>>, g:Fun<b,F<c>>) : Fun<a,F<c>> =>
 //  f.then(map_F<b,F<c>>(g)).then(join_F<c>())
@@ -427,6 +397,7 @@ type Exception<a> = Either<string,a>
 
 // Use the Exception monad to re-implement the functions of Question 1. This time report a message for each separate failure event in the following way:
 
+ 
 
 // In connect report a different exception message for a connection failure or an invalid ip. Use two different probabilities for the failures
 
