@@ -1,4 +1,4 @@
-import { Fun } from "./Fun"
+import { Fun, Unit } from "./Fun"
 
 type List<a> = {
     type: "cons",
@@ -16,8 +16,6 @@ let map_List = <a,b>(f:Fun<a,b>) : Fun<List<a>, List<b>> =>
     l.type === "empty" 
     ? Empty<b>() 
     : Cons<b>(f.f(l.head), map_List(f).f(l.tail)))
-
-type Unit = {};
 
 let unit_List = <a>() : Fun<Unit, List<a>> => Fun(u => Empty<a>())
 

@@ -1,0 +1,20 @@
+{
+  "name": "softwareengineering",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -w -pretty",
+    "exec": "node build/GrandeOmegaExercises.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^2.7.1",
+    "yarn": "^1.3.2"
+  },
+  "dependencies": {
+    "immutable": "^4.0.0-rc.12"
+  }
+}
