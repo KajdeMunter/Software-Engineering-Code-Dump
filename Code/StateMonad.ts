@@ -5,6 +5,7 @@ import { Pair, map_Pair, apply_Pair } from "./PairMonad";
 export interface State<s, a> {
     run: Fun<s, Pair<a, s>>
     then: <b>(f: Fun<a, State<s, b>>) => State<s, b> //this is bind
+    repeat: () => Fun<number, State<s, a>>
 }
 
 export let run_State = <s,a>() : Fun<State<s,a>, Fun<s, Pair<a, s>>> => Fun(s => s.run)
@@ -12,6 +13,7 @@ export let run_State = <s,a>() : Fun<State<s,a>, Fun<s, Pair<a, s>>> => Fun(s =>
 export let make_State = <s,a>(run:Fun<s, Pair<a, s>>) : State<s,a> => ({ 
     run:run, 
     then:function<b>(this:State<s,a>, k:Fun<a, State<s, b>>) : State<s,b> { return bind_State(this,k) }, 
+    repeat:function (this: State<s,a>) : Fun<number, State<s,a>> { return Fun<number,State<s,a>>(x => repeat(this,x)) }
 })
 
 export let map_State = <s, a, b>(f:Fun<a, b>) : Fun<State<s, a>, State<s, b>> =>

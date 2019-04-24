@@ -230,55 +230,43 @@ type DoublyList<a> = {
     head: a
     tail: DoublyList<a>
     prev: DoublyList<a>
-  } | { // last node
+  } | {
     kind: "Empty"
-    prev: DoublyList<a>
-  } | { // first node
-    kind: "Empty"
-    tail: DoublyList<a>
   }
 
+
 // Constructor to create cons
-let DoublyCons = <a>(val:a, t:DoublyList<a>, p:DoublyList<a>): DoublyList<a> => {
-    return {
+let DoublyCons = <a>(val:a, t:DoublyList<a>, p:DoublyList<a>): DoublyList<a> =>
+    ({
         kind: "Cons",
         head: val,
         tail: t,
         prev: p
-    }
-}
+    })
 
 // Constructor to create empty
-let DoublyEmptyLast = <a>(p:DoublyList<a>): DoublyList<a> =>  { 
-    return {
-        kind: "Empty",
-        prev: p
-    } 
-}
+let DoublyEmpty = <a>(): DoublyList<a> =>  ({ kind: "Empty" })
 
-let DoublyEmptyFirst = <a>(t:DoublyList<a>): DoublyList<a> =>  { 
-  return {
-      kind: "Empty",
-      tail: t
-  } 
-}
 
 // Implement the map_DoublyLinkedList function for a Binary Tree.
-// let map_DoublyLinkedList = <a, b>(_: Fun<a, b>) : Fun<DoublyList<a>, DoublyList<b>>
+let map_DoublyList = <a, b>(f: Fun<a, b>) : Fun<DoublyList<a>, DoublyList<b>> =>
+    Fun(l =>
+        l.kind === "Empty"
+        ? DoublyEmpty<b>()
+        : DoublyCons<b>(f.f(l.head), map_DoublyList(f).f(l.tail), map_DoublyList(f).f(l.prev)) // This might not work as the prev is already done. 
+    )
 
-
-// let map_doublylist = <a,b>(f:Fun<a,b>): Fun<DoublyList<a>,DoublyList<b>> => 
-//     Fun(l => 
-//         l.kind === "Cons" 
-//         ? DoublyCons(f.f(l.head), map_doublylist(f).f(l.tail), l.prev)
-//         : DoublyEmpty<b>(l));
 
 // Extend this functor with join and unit and give it a monoidal structure.
 
-// let unit_DoublyLinkedList = <a>() : Fun<a, DoublyLinkedList<a>>
-// let join_DoublyLinkedList = <a>(): 
-//   Fun<DoublyLinkedList<DoublyLinkedList<a>>, 
-//       DoublyLinkedList<a>>
+let unit_DoublyList = <a>() : Fun<a, DoublyList<a>> => Fun(_ => DoublyEmpty<a>())
+
+// let join_DoublyList = <a>(): Fun<DoublyList<DoublyList<a>>, DoublyList<a>> =>
+//     Fun(l_l =>
+//         l_l.kind === "Empty"
+//         ? l_l
+//         : 
+//       )
 
 
 // Define bind for the BinaryTree to make it a monad

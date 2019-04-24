@@ -37,7 +37,7 @@ let join_Co = <s,e,a> (): Fun<Coroutine<s,e,Coroutine<s,e,a>>, Coroutine<s,e,a>>
                 return inl().then(inl()).f(res.value.value)
             } else {
                 let rest:Pair<s,ContinuedCoroutine<s,e,ContinuedCoroutine<s,e,a>>> = res.value.value
-                return inl().then(inr()).then(map_Pair(id<s>(), join_Co<s, e, a>())).f(rest)
+                return inl().then(inr()).then(map_Pair(id<s>(), join_Co<s,e,a>()).f(rest))
             }
         } else {
             let final_res : Pair<Coroutine<s,e,a>, s> = res.value
